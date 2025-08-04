@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
-import { Send, Bot, User, Loader2, Menu } from "lucide-react";
+import { Send, Bot, User, Loader2, Menu, X } from "lucide-react";
 import MessageList from "./message-list";
 import TypingText from "./typing-text";
 import MessageInput from "./message-input";
@@ -12,12 +12,16 @@ import { Message } from "@/types/chat";
 // import { useEffect, useState, useRef } from 'react'
 import { ConversationService } from "@/lib/conversation-service";
 
-export default function StreamingChatInterface({ conversationId: initialConversationId }: { conversationId?: string } = {}) {
+export default function StreamingChatInterface({
+  conversationId: initialConversationId,
+}: { conversationId?: string } = {}) {
   const router = useRouter();
   const { user } = useAuth();
   // Sidebar state for conversation history
   const [conversations, setConversations] = useState<any[]>([]);
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialConversationId || null);
+  const [selectedConversationId, setSelectedConversationId] = useState<
+    string | null
+  >(initialConversationId || null);
 
   // Fetch conversation history on mount and when user changes
   useEffect(() => {
@@ -29,14 +33,19 @@ export default function StreamingChatInterface({ conversationId: initialConversa
         // For each conversation, fetch its latest message for preview
         const conversationsWithPreview = await Promise.all(
           (data || []).map(async (conv: any) => {
-            const messages = await ConversationService.getConversationHistory(conv.id, 1);
-            return { ...conv, preview: messages[0]?.content || '' };
+            const messages = await ConversationService.getConversationHistory(
+              conv.id,
+              1
+            );
+            return { ...conv, preview: messages[0]?.content || "" };
           })
         );
         setConversations(conversationsWithPreview);
         // If initialConversationId is set, load its messages
         if (initialConversationId) {
-          const convData = await ConversationService.getConversation(initialConversationId);
+          const convData = await ConversationService.getConversation(
+            initialConversationId
+          );
           setMessages(
             (convData.messages || []).map((msg: any) => ({
               id: msg.id,
@@ -64,7 +73,9 @@ export default function StreamingChatInterface({ conversationId: initialConversa
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   // Set default to DeepSeek model only
-  const [selectedModel, setSelectedModel] = useState("deepseek/deepseek-r1:free");
+  const [selectedModel, setSelectedModel] = useState(
+    "deepseek/deepseek-r1:free"
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -85,7 +96,10 @@ export default function StreamingChatInterface({ conversationId: initialConversa
     try {
       // If no conversation, create one first
       if (!conversationId) {
-        const newConv = await ConversationService.createConversation("New Chat", user.id);
+        const newConv = await ConversationService.createConversation(
+          "New Chat",
+          user.id
+        );
         conversationId = newConv.id;
         setSelectedConversationId(conversationId);
         // Refresh conversations list
@@ -95,7 +109,12 @@ export default function StreamingChatInterface({ conversationId: initialConversa
       }
 
       // Add user message to DB
-      await ConversationService.addMessage(conversationId as string, "user", content, user.id);
+      await ConversationService.addMessage(
+        conversationId as string,
+        "user",
+        content,
+        user.id
+      );
 
       const userMessage: Message = {
         id: Date.now().toString(),
@@ -112,7 +131,6 @@ export default function StreamingChatInterface({ conversationId: initialConversa
           role: msg.role,
           content: msg.content,
         }));
-
 
       // TEMP: Use Gemini API instead of DeepSeek
       // const response = await fetch("/api/chat", {
@@ -140,7 +158,7 @@ export default function StreamingChatInterface({ conversationId: initialConversa
         body: JSON.stringify({
           message: content,
           conversationId,
-          conversationHistory
+          conversationHistory,
         }),
       });
 
@@ -151,16 +169,30 @@ export default function StreamingChatInterface({ conversationId: initialConversa
 
       const data = await response.json();
 
-      // Add assistant message to DB
-      await ConversationService.addMessage(conversationId as string, "assistant", data.response, user.id);
+      // Set streaming message for typing animation
+      setStreamingMessage(data.response);
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: data.response,
-        role: "assistant",
-        timestamp: new Date(),
+      // Add assistant message to DB and messages after typing animation is done
+      const addAIMessageAfterTyping = () => {
+        ConversationService.addMessage(
+          conversationId as string,
+          "assistant",
+          data.response,
+          user.id
+        );
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: data.response,
+          role: "assistant",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setStreamingMessage("");
       };
-      setMessages((prev) => [...prev, assistantMessage]);
+
+      // Calculate typing duration
+      const typingDuration = data.response.length * 18; // 18ms per char (matches TypingText)
+      setTimeout(addAIMessageAfterTyping, typingDuration + 300); // +300ms for a natural pause
     } catch (error) {
       console.error("Error getting AI response:", error);
       const errorMessage: Message = {
@@ -181,7 +213,10 @@ export default function StreamingChatInterface({ conversationId: initialConversa
   // If selectedConversationId changes, update the URL
   // Use dynamic import to avoid SSR issues
   useEffect(() => {
-    if (selectedConversationId && selectedConversationId !== initialConversationId) {
+    if (
+      selectedConversationId &&
+      selectedConversationId !== initialConversationId
+    ) {
       router.push(`/conversation/${selectedConversationId}`);
     }
   }, [selectedConversationId, initialConversationId, router]);
@@ -189,19 +224,25 @@ export default function StreamingChatInterface({ conversationId: initialConversa
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen w-full">
+    <div className="flex flex-col md:flex-row h-screen w-full bg-gradient-to-br from-gray-50 via-white to-blue-50 dark:from-gray-950 dark:via-gray-900 dark:to-blue-950 transition-colors duration-300">
       {/* Mobile sidebar toggle button */}
       <button
         className="fixed top-4 left-4 z-50 md:hidden bg-primary text-primary-foreground rounded-full p-2 shadow-lg"
-        onClick={() => setSidebarOpen(true)}
-        aria-label="Open sidebar"
+        onClick={() => setSidebarOpen((prev) => !prev)}
+        aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
       >
-        <Menu className="h-6 w-6" />
+        {sidebarOpen ? (
+          <X className="h-6 w-6" />
+        ) : (
+          <Menu className="h-6 w-6" />
+        )}
       </button>
       {/* Sidebar */}
       <aside
-        className={`fixed md:static top-0 left-0 z-40 h-full w-72 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-lg p-4 gap-4 flex-col transition-transform duration-300 ${sidebarOpen ? 'flex translate-x-0' : 'hidden -translate-x-full'} md:flex md:translate-x-0`}
-        style={{ minHeight: '100vh' }}
+        className={`fixed md:static top-0 left-0 z-40 h-full w-11/12 max-w-xs md:max-w-xs bg-white/70 dark:bg-gray-900/70 backdrop-blur shadow-lg rounded-xl border-r border-gray-200 dark:border-gray-800 p-4 gap-4 flex-col transition-all duration-300 ${
+          sidebarOpen ? "flex translate-x-0" : "hidden -translate-x-full"
+        } md:flex md:translate-x-0`}
+        style={{ minHeight: "100vh" }}
       >
         {/* Close button for mobile */}
         <button
@@ -211,24 +252,31 @@ export default function StreamingChatInterface({ conversationId: initialConversa
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="text-xl font-bold mb-2">Conversations</div>
+        <div className="flex items-center pt-14 gap-2 text-xl font-bold mb-2">
+          <Bot className="h-5 w-5 text-primary" />
+          Conversations
+        </div>
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="text-muted-foreground text-sm">No history yet.</div>
           ) : (
             <ul className="space-y-2">
               {conversations.map((conv) => (
-                <li key={conv.id} className="group flex items-center">
+                <li
+                  key={conv.id}
+                  className="group flex items-center transition-all duration-300"
+                >
                   <button
-                    className={`flex-1 w-full text-left px-3 py-2 rounded-lg transition-colors font-medium text-base ${
+                    className={`flex-1 w-full text-left px-3 py-2 rounded-lg transition-all duration-300 font-medium text-base flex items-center gap-2 ${
                       selectedConversationId === conv.id
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-gray-100 dark:hover:bg-gray-900"
+                        ? "bg-primary/90 text-primary-foreground shadow-lg"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-900 hover:shadow-md"
                     }`}
                     onClick={async () => {
                       setSelectedConversationId(conv.id);
                       // Load messages for this conversation
-                      const convData = await ConversationService.getConversation(conv.id);
+                      const convData =
+                        await ConversationService.getConversation(conv.id);
                       setMessages(
                         (convData.messages || []).map((msg: any) => ({
                           id: msg.id,
@@ -239,18 +287,25 @@ export default function StreamingChatInterface({ conversationId: initialConversa
                       );
                     }}
                   >
-                    <div className="truncate font-semibold">{conv.title || "Untitled"}</div>
-                    {conv.preview && (
+                    <Bot className="h-4 w-4 mr-1 text-primary/70" />
+                    <div className="truncate text-sm font-semibold">
+                      {conv.title.split(" ").slice(0, 3).join(" ") ||
+                        "Untitled"}
+                      {conv.title.split(" ").length > 3 ? " ...." : ""}
+                    </div>
+                    {/* {conv.preview && (
                       <div className="truncate text-xs text-muted-foreground mt-1">{conv.preview.split(' ').slice(0, 8).join(' ')}{conv.preview.split(' ').length > 8 ? '...' : ''}</div>
-                    )}
+                    )} */}
                   </button>
                   <button
-                    className="ml-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition"
+                    className="ml-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-all duration-300"
                     title="Delete conversation"
                     onClick={async (e) => {
                       e.stopPropagation();
                       await ConversationService.deleteConversation(conv.id);
-                      setConversations(conversations.filter((c) => c.id !== conv.id));
+                      setConversations(
+                        conversations.filter((c) => c.id !== conv.id)
+                      );
                       if (selectedConversationId === conv.id) {
                         setSelectedConversationId(null);
                         setMessages([
@@ -265,7 +320,9 @@ export default function StreamingChatInterface({ conversationId: initialConversa
                       }
                     }}
                   >
-                    🗑️
+                    <span role="img" aria-label="Delete">
+                      🗑️
+                    </span>
                   </button>
                 </li>
               ))}
@@ -276,7 +333,10 @@ export default function StreamingChatInterface({ conversationId: initialConversa
           className="mt-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90"
           onClick={async () => {
             if (!user) return;
-            const newConv = await ConversationService.createConversation("New Chat", user.id);
+            const newConv = await ConversationService.createConversation(
+              "New Chat",
+              user.id
+            );
             setSelectedConversationId(newConv.id);
             setMessages([]);
             const data = await ConversationService.getConversations();
@@ -288,7 +348,7 @@ export default function StreamingChatInterface({ conversationId: initialConversa
       </aside>
 
       {/* Main chat area */}
-      <main className="flex-1 flex flex-col overflow-y-auto h-full">
+      <main className="flex-1 flex flex-col overflow-y-auto h-full px-1 md:px-0">
         {/* Header & Model Selector (always visible at the top) */}
         {/* <div className="flex flex-col gap-2 border-b bg-background/80 backdrop-blur p-4 sticky top-0 z-20">
           <div className="flex items-center justify-between">
@@ -303,9 +363,9 @@ export default function StreamingChatInterface({ conversationId: initialConversa
           </div>
         </div> */}
         <div className="flex-1 flex items-center justify-center">
-          <div className="relative flex flex-col w-full h-full bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="relative flex flex-col w-full h-full max-w-2xl md:max-w-3xl lg:max-w-4xl mx-auto bg-white dark:bg-gray-950 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             {/* Chat messages */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 mt-12 bg-gradient-to-b from-transparent to-gray-100 dark:to-gray-900">
+            <div className="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 mt-12 bg-gradient-to-b from-transparent to-gray-100 dark:to-gray-900">
               <MessageList messages={messages} />
               {streamingMessage && (
                 <div className="flex items-start space-x-3 justify-start mb-4">

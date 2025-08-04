@@ -3,12 +3,15 @@
 import { Bot, User } from 'lucide-react'
 import { Message } from '@/types/chat'
 import MessageContent from './message-content'
+import { useAuth } from '@/contexts/auth-context'
 
 interface MessageListProps {
   messages: Message[]
 }
 
 export default function MessageList({ messages }: MessageListProps) {
+  const { user, signOut } = useAuth();
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null;
   return (
     <div className="space-y-4">
       {messages.map((message) => (
@@ -38,7 +41,15 @@ export default function MessageList({ messages }: MessageListProps) {
           </div>
           {message.role === 'user' && (
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-              <User className="h-4 w-4" />
+              {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt="Profile"
+                      className="h-7 w-7 rounded-full border shadow object-cover"
+                    />
+                  ) : (
+                    <User className="h-4 w-4" />
+                  )}
             </div>
           )}
         </div>
